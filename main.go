@@ -20,6 +20,7 @@ import (
 var (
 	docStyle        = lipgloss.NewStyle().Margin(1, 2)
 	headerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true) // Lighter
+	gitStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))             // Greenish for git
 	selectedStyle   = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("170")).PaddingLeft(3)
 	unselectedStyle = lipgloss.NewStyle().PaddingLeft(4)
 	previewStyle    = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true, false, false, false).BorderForeground(lipgloss.Color("240")).Padding(1, 0)
@@ -29,16 +30,17 @@ type item struct {
 	SessionName string
 	WindowIndex string
 	WindowName  string
+	GitBranch   string
 }
 
 func (i item) Title() string       { return fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName) }
-func (i item) Description() string { return "" }
-func (i item) FilterValue() string { return i.SessionName + i.WindowName }
+func (i item) Description() string { return i.GitBranch }
+func (i item) FilterValue() string { return i.SessionName + i.WindowName + i.GitBranch }
 
 type itemDelegate struct{}
 
-func (d itemDelegate) Height() int                               { return 1 }
-func (d itemDelegate) Spacing() int                              { return 0 }
+func (d itemDelegate) Height() int                               { return 2 }
+func (d itemDelegate) Spacing() int                              { return 1 }
 func (d itemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd { return nil }
 func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
 	i, ok := listItem.(item)
@@ -46,12 +48,17 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	str := headerStyle.Render(fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName))
+	header := headerStyle.Render(fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName))
+	var gitLine string
+	if i.GitBranch != "" {
+		gitLine = gitStyle.Render(" " + i.GitBranch)
+	}
+	fullItem := header + "\n" + gitLine
 
 	if index == m.Index() {
-		fmt.Fprint(w, selectedStyle.Render(str))
+		fmt.Fprint(w, selectedStyle.Render(fullItem))
 	} else {
-		fmt.Fprint(w, unselectedStyle.Render(str))
+		fmt.Fprint(w, unselectedStyle.Render(fullItem))
 	}
 }
 
@@ -165,6 +172,16 @@ func getFullPaneContent(target string) string {
 	return out.String()
 }
 
+func getGitBranch(path string) string {
+	cmd := exec.Command("git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out.String())
+}
+
 func main() {
 	var sessionFlag string
 	var regexFlags stringSlice
@@ -174,9 +191,10 @@ func main() {
 	flag.Parse()
 
 	// Fetch tmux windows
-	args := []string{"list-windows", "-a", "-F", "#{session_name}|#{window_index}|#{window_name}|#{pane_current_command}"}
+	// Format: session_name|window_index|window_name|pane_current_command|pane_current_path
+	args := []string{"list-windows", "-a", "-F", "#{session_name}|#{window_index}|#{window_name}|#{pane_current_command}|#{pane_current_path}"}
 	if sessionFlag != "" {
-		args = []string{"list-windows", "-t", sessionFlag, "-F", "#{session_name}|#{window_index}|#{window_name}|#{pane_current_command}"}
+		args = []string{"list-windows", "-t", sessionFlag, "-F", "#{session_name}|#{window_index}|#{window_name}|#{pane_current_command}|#{pane_current_path}"}
 	}
 
 	cmd := exec.Command("tmux", args...)
@@ -202,11 +220,12 @@ func main() {
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Split(line, "|")
-		if len(parts) == 4 {
+		if len(parts) == 5 {
 			session := parts[0]
 			index := parts[1]
 			windowName := parts[2]
 			command := parts[3]
+			path := parts[4]
 
 			// Command regex filter (OR logic)
 			if len(regexes) > 0 {
@@ -226,6 +245,7 @@ func main() {
 				SessionName: session,
 				WindowIndex: index,
 				WindowName:  windowName,
+				GitBranch:   getGitBranch(path),
 			})
 		}
 	}
