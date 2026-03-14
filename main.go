@@ -151,7 +151,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			previewTotalHeight = availableHeight / 2
 		}
 		
-		listHeight := availableHeight - previewTotalHeight - 1 // -1 for status line
+		listHeight := availableHeight - previewTotalHeight - 2 // -2 for status line and filter line
 		if listHeight < 0 {
 			listHeight = 0
 		}
@@ -197,6 +197,11 @@ func (m model) View() string {
 		return "\n  Initializing..."
 	}
 
+	var filterView string
+	if m.list.FilterState() == list.Filtering {
+		filterView = lipgloss.NewStyle().MarginLeft(4).Foreground(lipgloss.Color("170")).Render("Filter: ") + m.list.FilterInput.View()
+	}
+
 	current := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(fmt.Sprintf("%d", m.list.Index()+1))
 	total := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(fmt.Sprintf("%d", len(m.list.Items())))
 	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render(" / ")
@@ -206,6 +211,7 @@ func (m model) View() string {
 	return docStyle.Render(
 		lipgloss.JoinVertical(
 			lipgloss.Left,
+			filterView,
 			m.list.View(),
 			status,
 			previewStyle.Render(m.viewport.View()),
