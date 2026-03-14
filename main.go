@@ -20,7 +20,6 @@ import (
 var (
 	docStyle        = lipgloss.NewStyle().Margin(1, 2)
 	headerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true) // Lighter
-	contentStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))            // Darker/Muted
 	selectedStyle   = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("170")).PaddingLeft(3)
 	unselectedStyle = lipgloss.NewStyle().PaddingLeft(4)
 	previewStyle    = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true, false, false, false).BorderForeground(lipgloss.Color("240")).Padding(1, 0)
@@ -30,19 +29,16 @@ type item struct {
 	SessionName string
 	WindowIndex string
 	WindowName  string
-	Content     string
 }
 
-func (i item) Title() string       { return i.Content }
+func (i item) Title() string       { return fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName) }
 func (i item) Description() string { return "" }
-func (i item) FilterValue() string { return i.SessionName + i.WindowName + i.Content }
+func (i item) FilterValue() string { return i.SessionName + i.WindowName }
 
-type itemDelegate struct {
-	height int
-}
+type itemDelegate struct{}
 
-func (d itemDelegate) Height() int                               { return d.height }
-func (d itemDelegate) Spacing() int                              { return 1 }
+func (d itemDelegate) Height() int                               { return 1 }
+func (d itemDelegate) Spacing() int                              { return 0 }
 func (d itemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd { return nil }
 func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
 	i, ok := listItem.(item)
@@ -50,14 +46,12 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	header := headerStyle.Render(fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName))
-	content := contentStyle.Render(i.Content)
-	fullItem := header + "\n" + content
+	str := headerStyle.Render(fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName))
 
 	if index == m.Index() {
-		fmt.Fprint(w, selectedStyle.Render(fullItem))
+		fmt.Fprint(w, selectedStyle.Render(str))
 	} else {
-		fmt.Fprint(w, unselectedStyle.Render(fullItem))
+		fmt.Fprint(w, unselectedStyle.Render(str))
 	}
 }
 
@@ -171,38 +165,12 @@ func getFullPaneContent(target string) string {
 	return out.String()
 }
 
-func getPaneContent(target string, n int) string {
-	cmd := exec.Command("tmux", "capture-pane", "-p", "-t", target)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return "Error capturing pane"
-	}
-
-	var lines []string
-	scanner := bufio.NewScanner(&out)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line != "" {
-			lines = append(lines, line)
-		}
-	}
-
-	if len(lines) > n {
-		lines = lines[len(lines)-n:]
-	}
-
-	return strings.Join(lines, "\n")
-}
-
 func main() {
 	var sessionFlag string
 	var regexFlags stringSlice
-	var linesFlag int
 
 	flag.StringVar(&sessionFlag, "session", "", "tmux session name to filter by")
 	flag.Var(&regexFlags, "command-regex", "regular expression to filter commands by (multiple allowed)")
-	flag.IntVar(&linesFlag, "lines", 3, "number of non-empty lines to show per window")
 	flag.Parse()
 
 	// Fetch tmux windows
@@ -254,12 +222,10 @@ func main() {
 				}
 			}
 
-			content := getPaneContent(fmt.Sprintf("%s:%s", session, index), linesFlag)
 			filteredItems = append(filteredItems, item{
 				SessionName: session,
 				WindowIndex: index,
 				WindowName:  windowName,
-				Content:     content,
 			})
 		}
 	}
@@ -270,7 +236,7 @@ func main() {
 	}
 
 	m := model{
-		list: list.New(filteredItems, itemDelegate{height: linesFlag + 1}, 0, 0),
+		list: list.New(filteredItems, itemDelegate{}, 0, 0),
 	}
 	m.list.SetShowTitle(false)
 	m.list.SetShowStatusBar(false)
