@@ -19,7 +19,10 @@ import (
 
 var (
 	docStyle        = lipgloss.NewStyle()
-	headerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true) // Lighter
+	sessionStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))            // Muted grey
+	windowStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true) // Bright pink, most noticeable
+	commandStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))            // Light grey
+	sepStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))            // Dark grey for separators
 	cmdStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))            // Orange/Yellow for command
 	pathStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))             // Blueish for path
 	gitStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))             // Greenish for git
@@ -58,7 +61,13 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	header := headerStyle.Render(fmt.Sprintf("%s :: %s:%s - %s", i.SessionName, i.WindowIndex, i.WindowName, i.CurrentCommand))
+	sName := sessionStyle.Render(i.SessionName)
+	wInfo := windowStyle.Render(fmt.Sprintf("%s:%s", i.WindowIndex, i.WindowName))
+	cName := commandStyle.Render(i.CurrentCommand)
+	sep1 := sepStyle.Render(" :: ")
+	sep2 := sepStyle.Render(" - ")
+
+	header := sName + sep1 + wInfo + sep2 + cName
 
 	cmd := ""
 	if i.FullCommand != "" {
