@@ -22,7 +22,7 @@ var (
 	sessionStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))            // Muted grey
 	windowStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true) // Bright pink, most noticeable
 	commandStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))            // Light grey
-	sepStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))            // Dark grey for separators
+	sepStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("33")).Bold(true)            // Dark grey for separators
 	cmdStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))            // Orange/Yellow for command
 	pathStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))             // Blueish for path
 	gitStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))             // Greenish for git
@@ -36,7 +36,6 @@ type item struct {
 	SessionName    string
 	WindowIndex    string
 	WindowName     string
-	CurrentCommand string
 	GitBranch      string
 	Path           string
 	FullCommand    string
@@ -47,11 +46,11 @@ func (i item) Title() string {
 	if window == "" {
 		window = i.WindowIndex
 	}
-	return fmt.Sprintf("%s :: %s - %s", i.SessionName, window, i.CurrentCommand)
+	return fmt.Sprintf("%s :: %s", i.SessionName, window)
 }
 func (i item) Description() string { return i.FullCommand + " " + i.Path + " " + i.GitBranch }
 func (i item) FilterValue() string {
-	return i.SessionName + i.WindowIndex + i.WindowName + i.CurrentCommand + i.GitBranch + i.Path + i.FullCommand
+	return i.SessionName + i.WindowIndex + i.WindowName + i.GitBranch + i.Path + i.FullCommand
 }
 
 type itemDelegate struct{}
@@ -72,11 +71,9 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	sName := sessionStyle.Render(i.SessionName)
 	wInfo := windowStyle.Render(displayWindow)
-	cName := commandStyle.Render(i.CurrentCommand)
 	sep1 := sepStyle.Render(" :: ")
-	sep2 := sepStyle.Render(" :: ")
 
-	header := sName + sep1 + wInfo + sep2 + cName
+	header := sName + sep1 + wInfo
 
 	cmd := ""
 	if i.FullCommand != "" {
@@ -228,8 +225,8 @@ func (m model) View() string {
 	}
 
 	current := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(fmt.Sprintf("%d", m.list.Index()+1))
-	total := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(fmt.Sprintf("%d", len(m.list.Items())))
-	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render(" / ")
+	total   := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(fmt.Sprintf("%d", len(m.list.Items())))
+	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(" / ")
 
 	status := statusStyle.Render(current + divider + total)
 
@@ -355,7 +352,6 @@ func main() {
 				SessionName:    session,
 				WindowIndex:    index,
 				WindowName:     windowName,
-				CurrentCommand: command,
 				GitBranch:      getGitBranch(path),
 				Path:           path,
 				FullCommand:    getFullCommand(tty),
