@@ -24,6 +24,7 @@ var (
 	gitStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))             // Greenish for git
 	selectedStyle   = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("170")).PaddingLeft(3)
 	unselectedStyle = lipgloss.NewStyle().PaddingLeft(4)
+	statusStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).MarginLeft(4)
 	previewStyle    = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true, false, false, false).BorderForeground(lipgloss.Color("240")).Padding(1, 0)
 )
 
@@ -179,10 +180,14 @@ func (m model) View() string {
 	if !m.ready {
 		return "\n  Initializing..."
 	}
+
+	status := statusStyle.Render(fmt.Sprintf("%d / %d", m.list.Index()+1, len(m.list.Items())))
+
 	return docStyle.Render(
 		lipgloss.JoinVertical(
 			lipgloss.Left,
 			m.list.View(),
+			status,
 			previewStyle.Render(m.viewport.View()),
 		),
 	)
@@ -288,6 +293,7 @@ func main() {
 	}
 	m.list.SetShowTitle(false)
 	m.list.SetShowStatusBar(false)
+	m.list.SetShowPagination(false)
 	m.list.KeyMap.Quit.SetKeys("q", "ctrl+c")
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
