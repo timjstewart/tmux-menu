@@ -30,18 +30,21 @@ var (
 )
 
 type item struct {
-	SessionName string
-	WindowIndex string
-	WindowName  string
-	GitBranch   string
-	Path        string
-	FullCommand string
+	SessionName    string
+	WindowIndex    string
+	WindowName     string
+	CurrentCommand string
+	GitBranch      string
+	Path           string
+	FullCommand    string
 }
 
-func (i item) Title() string       { return fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName) }
+func (i item) Title() string {
+	return fmt.Sprintf("%s :: %s:%s - %s", i.SessionName, i.WindowIndex, i.WindowName, i.CurrentCommand)
+}
 func (i item) Description() string { return i.FullCommand + " " + i.Path + " " + i.GitBranch }
 func (i item) FilterValue() string {
-	return i.SessionName + i.WindowName + i.GitBranch + i.Path + i.FullCommand
+	return i.SessionName + i.WindowIndex + i.WindowName + i.CurrentCommand + i.GitBranch + i.Path + i.FullCommand
 }
 
 type itemDelegate struct{}
@@ -55,7 +58,7 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	header := headerStyle.Render(fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName))
+	header := headerStyle.Render(fmt.Sprintf("%s :: %s:%s - %s", i.SessionName, i.WindowIndex, i.WindowName, i.CurrentCommand))
 
 	cmd := ""
 	if i.FullCommand != "" {
@@ -331,12 +334,13 @@ func main() {
 			}
 
 			filteredItems = append(filteredItems, item{
-				SessionName: session,
-				WindowIndex: index,
-				WindowName:  windowName,
-				GitBranch:   getGitBranch(path),
-				Path:        path,
-				FullCommand: getFullCommand(tty),
+				SessionName:    session,
+				WindowIndex:    index,
+				WindowName:     windowName,
+				CurrentCommand: command,
+				GitBranch:      getGitBranch(path),
+				Path:           path,
+				FullCommand:    getFullCommand(tty),
 			})
 		}
 	}
