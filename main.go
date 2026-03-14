@@ -197,7 +197,11 @@ func (m model) View() string {
 		return "\n  Initializing..."
 	}
 
-	status := statusStyle.Render(fmt.Sprintf("%d / %d", m.list.Index()+1, len(m.list.Items())))
+	current := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(fmt.Sprintf("%d", m.list.Index()+1))
+	total := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(fmt.Sprintf("%d", len(m.list.Items())))
+	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render(" / ")
+
+	status := statusStyle.Render(current + divider + total)
 
 	return docStyle.Render(
 		lipgloss.JoinVertical(
