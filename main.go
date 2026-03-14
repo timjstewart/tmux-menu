@@ -21,7 +21,7 @@ var (
 	sessionStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))            // Muted grey
 	windowStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true) // Bright pink, most noticeable
 	commandStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))            // Light grey
-	sepStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("33")).Bold(true)            // Dark grey for separators
+	sepStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("33")).Bold(true)  // Dark grey for separators
 	cmdStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))            // Orange/Yellow for command
 	pathStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))             // Blueish for path
 	gitStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))             // Greenish for git
@@ -31,12 +31,12 @@ var (
 )
 
 type item struct {
-	SessionName    string
-	WindowIndex    string
-	WindowName     string
-	GitBranch      string
-	Path           string
-	FullCommand    string
+	SessionName string
+	WindowIndex string
+	WindowName  string
+	GitBranch   string
+	Path        string
+	FullCommand string
 }
 
 func (i item) Title() string {
@@ -75,7 +75,7 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	cmd := ""
 	if i.FullCommand != "" {
-		cmd = cmdStyle.Render("> " + middleTruncate(i.FullCommand, 80)) + "\n"
+		cmd = cmdStyle.Render("> "+middleTruncate(i.FullCommand, 80)) + "\n"
 	}
 
 	path := tildify(i.Path)
@@ -124,9 +124,9 @@ func (s *stringSlice) Set(value string) error {
 }
 
 type model struct {
-	list             list.Model
-	selected         *item
-	ready            bool
+	list          list.Model
+	selected      *item
+	ready         bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -134,6 +134,21 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	oldIndex := m.list.Index()
+	var listCmd tea.Cmd
+	m.list, listCmd =  m.list.Update(msg)
+	if m.list.Index() != oldIndex {
+		i, ok := m.list.SelectedItem().(item)
+		if ok {
+			m.selected = &i
+			target := fmt.Sprintf("%s:%s", m.selected.SessionName, m.selected.WindowIndex)
+			cmd := exec.Command("tmux", "switch-client", "-t", target)
+			if err := cmd.Run(); err != nil {
+				fmt.Printf("Error switching to window: %v\n", err)
+			}
+		}
+	}
+
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -153,32 +168,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		listWidth := msg.Width
-		
+
 		availableHeight := msg.Height
-		
-		listHeight := max(0, availableHeight - 1) 
+
+		listHeight := max(0, availableHeight-1)
 
 		m.list.SetSize(listWidth, listHeight)
 
 		if !m.ready {
 			m.ready = true
-		} else {
 		}
 	}
 
-	var listCmd tea.Cmd
-	m.list, listCmd = m.list.Update(msg)
 	cmds = append(cmds, listCmd)
-
-	// if m.list.Index() != oldIndex || !m.ready {
-	// 	if i, ok := m.list.SelectedItem().(item); ok {
-	// 		content := getFullPaneContent(fmt.Sprintf("%s:%s", i.SessionName, i.WindowIndex))
-	// 	}
-	// }
-
-	//var viewCmd tea.Cmd
-	// m.viewport, viewCmd = m.viewport.Update(msg)
-	// cmds = append(cmds, viewCmd)
 
 	return m, tea.Batch(cmds...)
 }
@@ -189,7 +191,7 @@ func (m model) View() string {
 	}
 
 	current := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(fmt.Sprintf("%d", m.list.Index()+1))
-	total   := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(fmt.Sprintf("%d", len(m.list.Items())))
+	total := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(fmt.Sprintf("%d", len(m.list.Items())))
 	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Render(" / ")
 
 	status := statusStyle.Render(current + divider + total)
@@ -254,7 +256,6 @@ func main() {
 		args = []string{"list-windows", "-t", sessionFlag, "-F", "#{session_name}|#{window_index}|#{window_name}|#{pane_current_command}|#{pane_current_path}|#{pane_tty}"}
 	}
 
-
 	cmd := exec.Command("tmux", args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -301,12 +302,12 @@ func main() {
 			}
 
 			filteredItems = append(filteredItems, item{
-				SessionName:    session,
-				WindowIndex:    index,
-				WindowName:     windowName,
-				GitBranch:      getGitBranch(path),
-				Path:           path,
-				FullCommand:    getFullCommand(tty),
+				SessionName: session,
+				WindowIndex: index,
+				WindowName:  windowName,
+				GitBranch:   getGitBranch(path),
+				Path:        path,
+				FullCommand: getFullCommand(tty),
 			})
 		}
 	}
@@ -317,7 +318,7 @@ func main() {
 	}
 
 	m := model{
-		list:            list.New(filteredItems, itemDelegate{}, 0, 0),
+		list: list.New(filteredItems, itemDelegate{}, 0, 0),
 	}
 	m.list.SetShowTitle(false)
 	m.list.SetShowStatusBar(false)
@@ -332,17 +333,17 @@ func main() {
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
-	finalModel, err := p.Run()
+	_, err := p.Run()
 	if err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
 
-	if m, ok := finalModel.(model); ok && m.selected != nil {
-		target := fmt.Sprintf("%s:%s", m.selected.SessionName, m.selected.WindowIndex)
-		cmd := exec.Command("tmux", "switch-client", "-t", target)
-		if err := cmd.Run(); err != nil {
-			fmt.Printf("Error switching to window: %v\n", err)
-		}
-	}
+	// if m, ok := finalModel.(model); ok && m.selected != nil {
+	// 	target := fmt.Sprintf("%s:%s", m.selected.SessionName, m.selected.WindowIndex)
+	// 	cmd := exec.Command("tmux", "switch-client", "-t", target)
+	// 	if err := cmd.Run(); err != nil {
+	// 		fmt.Printf("Error switching to window: %v\n", err)
+	// 	}
+	// }
 }
