@@ -20,7 +20,7 @@ import (
 var (
 	docStyle        = lipgloss.NewStyle().Margin(1, 2)
 	headerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true) // Lighter
-	pathStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))            // Muted for path
+	pathStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))             // Blueish for path
 	gitStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))             // Greenish for git
 	selectedStyle   = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("170")).PaddingLeft(3)
 	unselectedStyle = lipgloss.NewStyle().PaddingLeft(4)
@@ -52,9 +52,13 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	header := headerStyle.Render(fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName))
 	
-	secondLine := pathStyle.Render(tildify(i.Path))
+	path := tildify(i.Path)
+	path = middleTruncate(path, 40)
+	secondLine := pathStyle.Render(path)
+
 	if i.GitBranch != "" {
-		secondLine += " " + gitStyle.Render(" "+i.GitBranch)
+		branch := middleTruncate(i.GitBranch, 20)
+		secondLine += " " + gitStyle.Render(" "+branch)
 	}
 	
 	fullItem := header + "\n" + secondLine
@@ -72,6 +76,17 @@ func tildify(path string) string {
 		return "~" + strings.TrimPrefix(path, home)
 	}
 	return path
+}
+
+func middleTruncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen < 5 { // Not enough room for meaningful truncation
+		return s[:maxLen]
+	}
+	half := (maxLen - 3) / 2
+	return s[:half] + "..." + s[len(s)-(maxLen-3-half):]
 }
 
 type stringSlice []string
