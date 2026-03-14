@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	docStyle        = lipgloss.NewStyle().Margin(1, 2)
+	docStyle        = lipgloss.NewStyle()
 	headerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true) // Lighter
 	pathStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))             // Blueish for path
 	gitStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))             // Greenish for git
@@ -141,12 +141,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
-		h, v := docStyle.GetFrameSize()
-		listWidth := msg.Width - h
+		listWidth := msg.Width
 		
 		// previewMaxLines + 3 (1 border + 2 padding)
 		previewTotalHeight := m.previewMaxLines + 3
-		availableHeight := msg.Height - v
+		availableHeight := msg.Height
 		
 		if previewTotalHeight > availableHeight/2 {
 			previewTotalHeight = availableHeight / 2
@@ -314,6 +313,7 @@ func main() {
 	m.list.SetShowTitle(false)
 	m.list.SetShowStatusBar(false)
 	m.list.SetShowPagination(false)
+	m.list.SetShowHelp(false)
 	m.list.KeyMap.Quit.SetKeys("q", "ctrl+c")
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
