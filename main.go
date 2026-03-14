@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -29,7 +28,6 @@ var (
 	selectedStyle   = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("170")).PaddingLeft(3)
 	unselectedStyle = lipgloss.NewStyle().PaddingLeft(4)
 	statusStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).MarginLeft(4)
-	previewStyle    = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true, false, false, false).BorderForeground(lipgloss.Color("240")).Padding(1, 0)
 )
 
 type item struct {
@@ -127,10 +125,8 @@ func (s *stringSlice) Set(value string) error {
 
 type model struct {
 	list             list.Model
-	viewport         viewport.Model
 	selected         *item
 	ready            bool
-	previewMaxLines  int
 }
 
 func (m model) Init() tea.Cmd {
@@ -154,67 +150,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = &i
 				return m, tea.Quit
 			}
-		case "pgup", "alt+v":
-			m.viewport.LineUp(m.viewport.Height)
-			return m, nil
-		case "pgdown", "ctrl+v":
-			m.viewport.LineDown(m.viewport.Height)
-			return m, nil
-		case "u":
-			m.viewport.LineUp(1)
-			return m, nil
-		case "d":
-			m.viewport.LineDown(1)
-			return m, nil
 		}
 	case tea.WindowSizeMsg:
 		listWidth := msg.Width
 		
-		// previewMaxLines + 3 (1 border + 2 padding)
-		previewTotalHeight := m.previewMaxLines + 3
 		availableHeight := msg.Height
 		
-		if previewTotalHeight > availableHeight/2 {
-			previewTotalHeight = availableHeight / 2
-		}
-		
-		listHeight := availableHeight - previewTotalHeight - 1 // -1 for status line
-		if listHeight < 0 {
-			listHeight = 0
-		}
+		listHeight := max(0, availableHeight - 1) 
 
 		m.list.SetSize(listWidth, listHeight)
 
-		viewportHeight := previewTotalHeight - 3
-		if viewportHeight < 0 {
-			viewportHeight = 0
-		}
-
 		if !m.ready {
-			m.viewport = viewport.New(listWidth, viewportHeight)
 			m.ready = true
 		} else {
-			m.viewport.Width = listWidth
-			m.viewport.Height = viewportHeight
 		}
 	}
 
-	oldIndex := m.list.Index()
 	var listCmd tea.Cmd
 	m.list, listCmd = m.list.Update(msg)
 	cmds = append(cmds, listCmd)
 
-	if m.list.Index() != oldIndex || !m.ready {
-		if i, ok := m.list.SelectedItem().(item); ok {
-			content := getFullPaneContent(fmt.Sprintf("%s:%s", i.SessionName, i.WindowIndex))
-			m.viewport.SetContent(content)
-			m.viewport.GotoBottom()
-		}
-	}
+	// if m.list.Index() != oldIndex || !m.ready {
+	// 	if i, ok := m.list.SelectedItem().(item); ok {
+	// 		content := getFullPaneContent(fmt.Sprintf("%s:%s", i.SessionName, i.WindowIndex))
+	// 	}
+	// }
 
-	var viewCmd tea.Cmd
-	m.viewport, viewCmd = m.viewport.Update(msg)
-	cmds = append(cmds, viewCmd)
+	//var viewCmd tea.Cmd
+	// m.viewport, viewCmd = m.viewport.Update(msg)
+	// cmds = append(cmds, viewCmd)
 
 	return m, tea.Batch(cmds...)
 }
@@ -235,20 +199,8 @@ func (m model) View() string {
 			lipgloss.Left,
 			m.list.View(),
 			status,
-			previewStyle.Render(m.viewport.View()),
 		),
 	)
-}
-
-func getFullPaneContent(target string) string {
-	// -S - gets the entire history
-	cmd := exec.Command("tmux", "capture-pane", "-p", "-t", target, "-S", "-")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return "Error capturing pane"
-	}
-	return out.String()
 }
 
 func getGitBranch(path string) string {
@@ -366,7 +318,6 @@ func main() {
 
 	m := model{
 		list:            list.New(filteredItems, itemDelegate{}, 0, 0),
-		previewMaxLines: previewLines,
 	}
 	m.list.SetShowTitle(false)
 	m.list.SetShowStatusBar(false)
