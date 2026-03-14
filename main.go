@@ -20,6 +20,7 @@ import (
 var (
 	docStyle        = lipgloss.NewStyle().Margin(1, 2)
 	headerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true) // Lighter
+	pathStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))            // Muted for path
 	gitStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))             // Greenish for git
 	selectedStyle   = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("170")).PaddingLeft(3)
 	unselectedStyle = lipgloss.NewStyle().PaddingLeft(4)
@@ -31,11 +32,12 @@ type item struct {
 	WindowIndex string
 	WindowName  string
 	GitBranch   string
+	Path        string
 }
 
 func (i item) Title() string       { return fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName) }
-func (i item) Description() string { return i.GitBranch }
-func (i item) FilterValue() string { return i.SessionName + i.WindowName + i.GitBranch }
+func (i item) Description() string { return i.Path + " " + i.GitBranch }
+func (i item) FilterValue() string { return i.SessionName + i.WindowName + i.GitBranch + i.Path }
 
 type itemDelegate struct{}
 
@@ -49,17 +51,27 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	}
 
 	header := headerStyle.Render(fmt.Sprintf("[%s] %s:%s", i.SessionName, i.WindowIndex, i.WindowName))
-	var gitLine string
+	
+	secondLine := pathStyle.Render(tildify(i.Path))
 	if i.GitBranch != "" {
-		gitLine = gitStyle.Render(" " + i.GitBranch)
+		secondLine += " " + gitStyle.Render(" "+i.GitBranch)
 	}
-	fullItem := header + "\n" + gitLine
+	
+	fullItem := header + "\n" + secondLine
 
 	if index == m.Index() {
 		fmt.Fprint(w, selectedStyle.Render(fullItem))
 	} else {
 		fmt.Fprint(w, unselectedStyle.Render(fullItem))
 	}
+}
+
+func tildify(path string) string {
+	home := os.Getenv("HOME")
+	if home != "" && strings.HasPrefix(path, home) {
+		return "~" + strings.TrimPrefix(path, home)
+	}
+	return path
 }
 
 type stringSlice []string
@@ -246,6 +258,7 @@ func main() {
 				WindowIndex: index,
 				WindowName:  windowName,
 				GitBranch:   getGitBranch(path),
+				Path:        path,
 			})
 		}
 	}
