@@ -43,7 +43,11 @@ type item struct {
 }
 
 func (i item) Title() string {
-	return fmt.Sprintf("%s :: %s:%s - %s", i.SessionName, i.WindowIndex, i.WindowName, i.CurrentCommand)
+	window := i.WindowName
+	if window == "" {
+		window = i.WindowIndex
+	}
+	return fmt.Sprintf("%s :: %s - %s", i.SessionName, window, i.CurrentCommand)
 }
 func (i item) Description() string { return i.FullCommand + " " + i.Path + " " + i.GitBranch }
 func (i item) FilterValue() string {
@@ -61,8 +65,13 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
+	displayWindow := i.WindowName
+	if displayWindow == "" {
+		displayWindow = i.WindowIndex
+	}
+
 	sName := sessionStyle.Render(i.SessionName)
-	wInfo := windowStyle.Render(fmt.Sprintf("%s:%s", i.WindowIndex, i.WindowName))
+	wInfo := windowStyle.Render(displayWindow)
 	cName := commandStyle.Render(i.CurrentCommand)
 	sep1 := sepStyle.Render(" :: ")
 	sep2 := sepStyle.Render(" - ")
