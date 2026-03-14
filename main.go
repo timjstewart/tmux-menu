@@ -99,10 +99,11 @@ func (s *stringSlice) Set(value string) error {
 }
 
 type model struct {
-	list     list.Model
-	viewport viewport.Model
-	selected *item
-	ready    bool
+	list             list.Model
+	viewport         viewport.Model
+	selected         *item
+	ready            bool
+	previewMaxLines  int
 }
 
 func (m model) Init() tea.Cmd {
@@ -142,17 +143,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize()
 		listWidth := msg.Width - h
-		listHeight := (msg.Height - v) / 2
-		previewHeight := (msg.Height - v) - listHeight
+		
+		// previewMaxLines + 3 (1 border + 2 padding)
+		previewTotalHeight := m.previewMaxLines + 3
+		availableHeight := msg.Height - v
+		
+		if previewTotalHeight > availableHeight/2 {
+			previewTotalHeight = availableHeight / 2
+		}
+		
+		listHeight := availableHeight - previewTotalHeight - 1 // -1 for status line
+		if listHeight < 0 {
+			listHeight = 0
+		}
 
 		m.list.SetSize(listWidth, listHeight)
 
+		viewportHeight := previewTotalHeight - 3
+		if viewportHeight < 0 {
+			viewportHeight = 0
+		}
+
 		if !m.ready {
-			m.viewport = viewport.New(listWidth, previewHeight-2) // -2 for border and padding
+			m.viewport = viewport.New(listWidth, viewportHeight)
 			m.ready = true
 		} else {
 			m.viewport.Width = listWidth
-			m.viewport.Height = previewHeight - 2
+			m.viewport.Height = viewportHeight
 		}
 	}
 
@@ -217,9 +234,11 @@ func getGitBranch(path string) string {
 func main() {
 	var sessionFlag string
 	var regexFlags stringSlice
+	var previewLines int
 
 	flag.StringVar(&sessionFlag, "session", "", "tmux session name to filter by")
 	flag.Var(&regexFlags, "command-regex", "regular expression to filter commands by (multiple allowed)")
+	flag.IntVar(&previewLines, "preview-lines", 4, "max number of lines in the preview pane")
 	flag.Parse()
 
 	// Fetch tmux windows
@@ -289,7 +308,8 @@ func main() {
 	}
 
 	m := model{
-		list: list.New(filteredItems, itemDelegate{}, 0, 0),
+		list:            list.New(filteredItems, itemDelegate{}, 0, 0),
+		previewMaxLines: previewLines,
 	}
 	m.list.SetShowTitle(false)
 	m.list.SetShowStatusBar(false)
