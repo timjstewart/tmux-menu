@@ -74,7 +74,7 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	wInfo := windowStyle.Render(displayWindow)
 	cName := commandStyle.Render(i.CurrentCommand)
 	sep1 := sepStyle.Render(" :: ")
-	sep2 := sepStyle.Render(" - ")
+	sep2 := sepStyle.Render(" :: ")
 
 	header := sName + sep1 + wInfo + sep2 + cName
 
