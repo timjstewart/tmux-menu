@@ -124,9 +124,9 @@ func (s *stringSlice) Set(value string) error {
 }
 
 type model struct {
-	list          list.Model
-	selected      *item
-	ready         bool
+	list     list.Model
+	selected *item
+	ready    bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -134,13 +134,19 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	oldIndex := m.list.Index()
+	var prevIndex int = 0
+	prevItem, ok := m.list.SelectedItem().(item)
+	if ok {
+		prevIndex = m.list.Index()
+	}
+
 	var listCmd tea.Cmd
-	m.list, listCmd =  m.list.Update(msg)
-	if m.list.Index() != oldIndex {
-		i, ok := m.list.SelectedItem().(item)
-		if ok {
-			m.selected = &i
+	m.list, listCmd = m.list.Update(msg)
+
+	newItem, ok := m.list.SelectedItem().(item)
+	if ok {
+		if m.list.Index() != prevIndex || prevItem != newItem {
+			m.selected = &newItem
 			target := fmt.Sprintf("%s:%s", m.selected.SessionName, m.selected.WindowIndex)
 			cmd := exec.Command("tmux", "switch-client", "-t", target)
 			if err := cmd.Run(); err != nil {
@@ -159,29 +165,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "enter":
-			i, ok := m.list.SelectedItem().(item)
-			if ok {
-				m.selected = &i
-				return m, tea.Quit
-			}
 		}
 	case tea.WindowSizeMsg:
 		listWidth := msg.Width
-
 		availableHeight := msg.Height
-
 		listHeight := max(0, availableHeight-1)
-
 		m.list.SetSize(listWidth, listHeight)
-
 		if !m.ready {
 			m.ready = true
 		}
 	}
 
 	cmds = append(cmds, listCmd)
-
 	return m, tea.Batch(cmds...)
 }
 
