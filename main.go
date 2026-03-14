@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -22,6 +23,7 @@ var (
 	contentStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))            // Darker/Muted
 	selectedStyle   = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("170")).PaddingLeft(3)
 	unselectedStyle = lipgloss.NewStyle().PaddingLeft(4)
+	previewStyle    = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true, false, false, false).BorderForeground(lipgloss.Color("240")).Padding(1, 0)
 )
 
 type item struct {
@@ -69,7 +71,9 @@ func (s *stringSlice) Set(value string) error {
 
 type model struct {
 	list     list.Model
+	viewport viewport.Model
 	selected *item
+	ready    bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -77,6 +81,8 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.list.FilterState() == list.Filtering {
@@ -91,25 +97,78 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = &i
 				return m, tea.Quit
 			}
-		case "j":
-			m.list.CursorDown()
+		case "pgup", "alt+v":
+			m.viewport.LineUp(m.viewport.Height)
 			return m, nil
-		case "k":
-			m.list.CursorUp()
+		case "pgdown", "ctrl+v":
+			m.viewport.LineDown(m.viewport.Height)
+			return m, nil
+		case "u":
+			m.viewport.LineUp(1)
+			return m, nil
+		case "d":
+			m.viewport.LineDown(1)
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v)
+		listWidth := msg.Width - h
+		listHeight := (msg.Height - v) / 2
+		previewHeight := (msg.Height - v) - listHeight
+
+		m.list.SetSize(listWidth, listHeight)
+
+		if !m.ready {
+			m.viewport = viewport.New(listWidth, previewHeight-2) // -2 for border and padding
+			m.ready = true
+		} else {
+			m.viewport.Width = listWidth
+			m.viewport.Height = previewHeight - 2
+		}
 	}
 
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+	oldIndex := m.list.Index()
+	var listCmd tea.Cmd
+	m.list, listCmd = m.list.Update(msg)
+	cmds = append(cmds, listCmd)
+
+	if m.list.Index() != oldIndex || !m.ready {
+		if i, ok := m.list.SelectedItem().(item); ok {
+			content := getFullPaneContent(fmt.Sprintf("%s:%s", i.SessionName, i.WindowIndex))
+			m.viewport.SetContent(content)
+			m.viewport.GotoBottom()
+		}
+	}
+
+	var viewCmd tea.Cmd
+	m.viewport, viewCmd = m.viewport.Update(msg)
+	cmds = append(cmds, viewCmd)
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
-	return docStyle.Render(m.list.View())
+	if !m.ready {
+		return "\n  Initializing..."
+	}
+	return docStyle.Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			m.list.View(),
+			previewStyle.Render(m.viewport.View()),
+		),
+	)
+}
+
+func getFullPaneContent(target string) string {
+	// -S - gets the entire history
+	cmd := exec.Command("tmux", "capture-pane", "-p", "-t", target, "-S", "-")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "Error capturing pane"
+	}
+	return out.String()
 }
 
 func getPaneContent(target string, n int) string {
